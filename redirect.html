@@ -41,7 +41,7 @@
   // ─────────────────────────────────────────────────────────────
   // CONFIGURA QUI: l'URL del tuo Apps Script Web App (termina in /exec)
   // ─────────────────────────────────────────────────────────────
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzR4F0jacJ4DfkZwx-DOfAKOs0KiDXCrgFF5Ct9f8qEb_e2dZH99cicHt41o4sToE59/exec';
+  const SCRIPT_URL = 'INCOLLA_QUI_IL_TUO_URL_APPS_SCRIPT_/exec';
 
   const params = new URLSearchParams(window.location.search);
   const ref = params.get('ref');
@@ -51,23 +51,34 @@
   if (!ref || !platform) {
     msg.textContent = 'Link non valido: manca il riferimento dipendente o la piattaforma.';
   } else {
-    // Usiamo JSONP (uno <script> caricato dinamicamente) invece di fetch,
-    // perché Apps Script su un altro dominio (GitHub Pages) può avere
-    // problemi di CORS con fetch().
-    window.__reviewTrackerCallback = function (data) {
-      if (data && data.dest) {
-        window.location.replace(data.dest);
-      } else {
-        msg.textContent = (data && data.error) ? data.error : 'Destinazione non configurata. Controlla il foglio "Settings".';
-      }
-    };
+    // ── Deduplica per dispositivo ──────────────────────────────────
+    // Se questo browser ha già registrato un click per questo
+    // dipendente+piattaforma, reindirizza di nuovo senza contare un
+    // altro click (usa l'URL salvato la prima volta).
+    const storageKey = 'rt_voted_' + ref + '_' + platform;
+    const cached = localStorage.getItem(storageKey);
+    if (cached) {
+      window.location.replace(cached);
+    } else {
+      // Usiamo JSONP (uno <script> caricato dinamicamente) invece di fetch,
+      // perché Apps Script su un altro dominio (GitHub Pages) può avere
+      // problemi di CORS con fetch().
+      window.__reviewTrackerCallback = function (data) {
+        if (data && data.dest) {
+          try { localStorage.setItem(storageKey, data.dest); } catch (e) {}
+          window.location.replace(data.dest);
+        } else {
+          msg.textContent = (data && data.error) ? data.error : 'Destinazione non configurata. Controlla il foglio "Settings".';
+        }
+      };
 
-    const script = document.createElement('script');
-    script.src = `${SCRIPT_URL}?ref=${encodeURIComponent(ref)}&platform=${encodeURIComponent(platform)}&callback=__reviewTrackerCallback`;
-    script.onerror = function () {
-      msg.textContent = 'Errore di connessione al backend. Controlla l\'URL Apps Script e che l\'app web sia accessibile a "Chiunque".';
-    };
-    document.body.appendChild(script);
+      const script = document.createElement('script');
+      script.src = `${SCRIPT_URL}?ref=${encodeURIComponent(ref)}&platform=${encodeURIComponent(platform)}&callback=__reviewTrackerCallback`;
+      script.onerror = function () {
+        msg.textContent = 'Errore di connessione al backend. Controlla l\'URL Apps Script e che l\'app web sia accessibile a "Chiunque".';
+      };
+      document.body.appendChild(script);
+    }
   }
 </script>
 </body>
